@@ -15,12 +15,12 @@ USER_NAME = ""
 PASSWD = ""
 
 """ Subreddit GLOBALS """
-SUBREDDIT = 'wallstreetbets'
+SUBREDDIT = 'stocks'
 POST_PULL_COUNT = 10
 
 """ Write path """
-WRITE_PATH_POST = '/home/reddit/wallstreetbets'
-WRITE_PATH_COMMENT = '/home/reddit/wallstreetbets_hot_comments'
+WRITE_PATH_POST = '/posts'
+WRITE_PATH_COMMENT = '/comments'
 
 
 def main():
@@ -41,21 +41,20 @@ def main():
     """ Pull the posts and write the file to JSON """
     try:
         for submission in subreddit_pull:
-            item = reddit.submission(submission.id)
-
-            created_timestamp = datetime.datetime.fromtimestamp(item.created_utc)
-            filename = subreddit.display_name + '-' + submission.id + '.json'
             data = []
+            item = reddit.submission(submission.id)
+            created_timestamp = datetime.datetime.fromtimestamp(item.created_utc)
+            filename = submission.id + '.json'
 
             """ Check if post has been edited """
             if item.edited > 0:
                 edited_timestamp = datetime.datetime.fromtimestamp(item.edited)
                 data.append({
+                    'created': created_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'),
                     'id': item.id,
                     'author': str(item.author),
                     'title': item.title,
                     'description': item.selftext.replace('\n', ' '),
-                    'created': created_timestamp.strftime('%m-%d-%Y %H:%M:%S'),
                     'permalink': item.permalink,
                     'url': item.url,
                     'up_votes': item.ups,
@@ -66,15 +65,15 @@ def main():
                     'nsfw': item.over_18,
                     'crossposts': item.num_crossposts,
                     'stickied': item.stickied,
-                    'edited': edited_timestamp.strftime('%m-%d-%Y %H:%M:%S')
+                    'edited': edited_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f')
                 })
             else:
                 data.append({
+                    'created': created_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'),
                     'id': item.id,
                     'author': str(item.author),
                     'title': item.title,
                     'description': item.selftext.replace('\n', ' '),
-                    'created': created_timestamp.strftime('%m-%d-%Y %H:%M:%S'),
                     'permalink': item.permalink,
                     'url': item.url,
                     'up_votes': item.ups,
@@ -91,29 +90,27 @@ def main():
             """ Write the post JSON to file """
             if not os.path.exists(os.path.join(WRITE_PATH_POST, filename)):
                 try:
-                    with open(os.path.join(WRITE_PATH_POST, filename), 'w') as f:
-                        json.dump(data[0], f, indent=2)
-
+                    with open(os.path.join(WRITE_PATH_POST, filename), 'w', newline='', encoding="utf-8") as f:
+                        json.dump(data[0], f)
                 except Exception:
                     sys.exit("Error writing the post JSON file {}".format(os.path.join(WRITE_PATH_POST, filename)))
 
             ''' Get the top-level comments for the post '''
-            data.clear()
             comments = reddit.submission(item.id)
 
             for comment in comments.comments:
                 if isinstance(comment, MoreComments):
                     continue
-
-                filename = subreddit.display_name + '-' + comment.id + '.json'
+                data = []
+                filename = comment.id + '.json'
                 created_timestamp = datetime.datetime.fromtimestamp(comment.created_utc)
 
                 """ Check if post has been edited """
                 if comment.edited > 0:
                     edited_timestamp = datetime.datetime.fromtimestamp(comment.edited)
                     data.append({
-                        'created': created_timestamp.strftime('%m-%d-%Y %H:%M:%S'),
-                        'id': comment.id,
+                        'created': created_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'),
+                        'id': str(comment.id),
                         'parent_post': item.id,
                         'author': str(comment.author),
                         'description': comment.body.replace('\n', ' '),
@@ -125,12 +122,12 @@ def main():
                         'total_awards': comment.total_awards_received,
                         'controversiality': comment.controversiality,
                         'depth': comment.depth,
-                        'edited': edited_timestamp.strftime('%m-%d-%Y %H:%M:%S')
+                        'edited': edited_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f')
                     })
                 else:
                     data.append({
-                        'created': created_timestamp.strftime('%m-%d-%Y %H:%M:%S'),
-                        'id': comment.id,
+                        'created': created_timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'),
+                        'id': str(comment.id),
                         'parent_post': item.id,
                         'author': str(comment.author),
                         'description': comment.body.replace('\n', ' '),
@@ -148,7 +145,7 @@ def main():
                 """ Write the comment JSON to file """
                 if not os.path.exists(os.path.join(WRITE_PATH_COMMENT, filename)):
                     try:
-                        with open(os.path.join(WRITE_PATH, filename), 'w', newline='', encoding="utf-8") as f:
+                        with open(os.path.join(WRITE_PATH_COMMENT, filename), 'w', newline='', encoding="utf-8") as f:
                             json.dump(data[0], f)
                     except Exception:
                         sys.exit("Error writing the comment JSON file {}".format(os.path.join(WRITE_PATH_COMMENT, filename)))
