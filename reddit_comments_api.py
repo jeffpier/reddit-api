@@ -15,15 +15,12 @@ USER_NAME = ""
 PASSWD = ""
 
 """ Subreddit GLOBALS """
-SUBREDDIT = 'stocks'
-POST_PULL_COUNT = 10
-
-""" Write path """
-WRITE_PATH_POST = '/posts'
-WRITE_PATH_COMMENT = '/comments'
+SUBREDDIT = ("stocks", "wallstreetbets", "investing", "options")
+POST_PULL_COUNT = 5
+WRITE_PATH = "/reddit"
 
 
-def main():
+def main(sub):
     """ Authenticate """
     try:
         reddit = praw.Reddit(client_id=C_ID, client_secret=C_SECRET, user_agent=USER_AGENT)
@@ -32,11 +29,11 @@ def main():
 
     """ Verify the Subreddit exists """
     try:
-        reddit.subreddits.search_by_name(SUBREDDIT, exact=True)
-        subreddit = reddit.subreddit(SUBREDDIT)
+        reddit.subreddits.search_by_name(sub, exact=True)
+        subreddit = reddit.subreddit(sub)
         subreddit_pull = subreddit.hot(limit=POST_PULL_COUNT)
     except Exception:
-        sys.exit('Could not find subreddit \'{}\''.format(SUBREDDIT))
+        sys.exit('Could not find subreddit \'{}\''.format(sub))
 
     """ Pull the posts and write the file to JSON """
     try:
@@ -88,12 +85,33 @@ def main():
                 })
 
             """ Write the post JSON to file """
-            if not os.path.exists(os.path.join(WRITE_PATH_POST, filename)):
+            if not os.path.exists(os.path.join(WRITE_PATH, sub, filename)):
                 try:
-                    with open(os.path.join(WRITE_PATH_POST, filename), 'w', newline='', encoding="utf-8") as f:
+                    with open(os.path.join(WRITE_PATH, sub, filename), 'w', newline='', encoding="utf-8") as f:
                         json.dump(data[0], f)
+                        f.close()
                 except Exception:
-                    sys.exit("Error writing the post JSON file {}".format(os.path.join(WRITE_PATH_POST, filename)))
+                    sys.exit("Error writing the post JSON file {}".format(os.path.join(WRITE_PATH, sub, filename)))
+            else:
+                try:
+                    with open(os.path.join(WRITE_PATH, "temp", "temp.json"), 'w', newline='', encoding="utf-8") as f:
+                        json.dump(data[0], f)
+                        f.close()
+                    with open(os.path.join(WRITE_PATH, "temp", "temp.json"), 'rb') as f:
+                        json_temp = json.load(f)
+                        f.close()
+                    with open(os.path.join(WRITE_PATH, sub, filename), 'rb') as f:
+                        json_file = json.load(f)
+                        f.close()
+                    if json_file == json_temp:
+                        continue
+                    else:
+                        with open(os.path.join(WRITE_PATH, sub, filename), 'w', newline='', encoding="utf-8") as f:
+                            json.dump(data[0], f)
+                            f.close()
+                except Exception:
+                    sys.exit("Error hashing the JSON file {}".format(os.path.join(WRITE_PATH, sub, filename)))
+
 
             ''' Get the top-level comments for the post '''
             comments = reddit.submission(item.id)
@@ -115,7 +133,7 @@ def main():
                         'author': str(comment.author),
                         'description': comment.body.replace('\n', ' '),
                         'permalink': comment.permalink,
-                        'subreddit': SUBREDDIT,
+                        'subreddit': sub,
                         'up_votes': comment.ups,
                         'down_votes': comment.downs,
                         'score': comment.score,
@@ -132,7 +150,7 @@ def main():
                         'author': str(comment.author),
                         'description': comment.body.replace('\n', ' '),
                         'permalink': comment.permalink,
-                        'subreddit': SUBREDDIT,
+                        'subreddit': sub,
                         'up_votes': comment.ups,
                         'down_votes': comment.downs,
                         'score': comment.score,
@@ -143,16 +161,43 @@ def main():
                     })
 
                 """ Write the comment JSON to file """
-                if not os.path.exists(os.path.join(WRITE_PATH_COMMENT, filename)):
+                if not os.path.exists(os.path.join(WRITE_PATH, sub + "_comments", filename)):
                     try:
-                        with open(os.path.join(WRITE_PATH_COMMENT, filename), 'w', newline='', encoding="utf-8") as f:
+                        with open(os.path.join(WRITE_PATH, sub + "_comments", filename), 'w', newline='', encoding="utf-8") as f:
                             json.dump(data[0], f)
                     except Exception:
-                        sys.exit("Error writing the comment JSON file {}".format(os.path.join(WRITE_PATH_COMMENT, filename)))
+                        sys.exit(
+                            "Error writing the comment JSON file {}".format(os.path.join(WRITE_PATH, sub + "_comments", filename)))
+                else:
+                    try:
+                        with open(os.path.join(WRITE_PATH, "temp", "temp.json"), 'w', newline='', encoding="utf-8") as f:
+                            json.dump(data[0], f)
+                            f.close()
+                        with open(os.path.join(WRITE_PATH, "temp", "temp.json"), 'rb') as f:
+                            json_temp = json.load(f)
+                            f.close()
+                        with open(os.path.join(WRITE_PATH, sub + "_comments", filename), 'rb') as f:
+                            json_file = json.load(f)
+                            f.close()
+                        if json_file == json_temp:
+                            continue
+                        else:
+                            with open(os.path.join(WRITE_PATH, sub + "_comments", filename), 'w', newline='', encoding="utf-8") as f:
+                                json.dump(data[0], f)
+                                f.close()
+                    except Exception:
+                        sys.exit("Error hashing the JSON file {}".format(os.path.join(WRITE_PATH, sub, filename)))
 
     except Exception:
         sys.exit('Error with the API pull, try adjusting the number of posts to pull in variable POST_PULL_COUNT.')
 
 
 if __name__ == '__main__':
-    main()
+    for sub in SUBREDDIT:
+        if not os.path.exists(os.path.join(WRITE_PATH, "temp")):
+            os.makedirs(os.path.join(WRITE_PATH, "temp"))
+        if not os.path.exists(os.path.join(WRITE_PATH, sub)):
+            os.makedirs(os.path.join(WRITE_PATH, sub))
+        if not os.path.exists(os.path.join(WRITE_PATH, sub + '_comments')):
+            os.makedirs(os.path.join(WRITE_PATH, sub + '_comments'))
+        main(sub)
